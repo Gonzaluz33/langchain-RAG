@@ -1,4 +1,5 @@
 import os
+import ollama
 import pandas as pd
 from typing import List
 from datetime import date
@@ -7,17 +8,14 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, Date, Float
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.base import Embeddings
-import ollama
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from langchain_anthropic import ChatAnthropic
-
 from langchain.agents import Tool, initialize_agent, AgentType
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain import SQLDatabase
 from sqlalchemy import text
-
 # Watsonx imports
 from ibm_watsonx_ai import Credentials, APIClient
 from langchain_ibm import WatsonxLLM
@@ -50,7 +48,7 @@ class Asistente(Base):
     tecnologias = Column(ARRAY(String))
     categoria = Column(String(100))
     keywords = Column(ARRAY(String))
-    url_repo_pruebas = Column(String(255))
+    url_repo_pruebas = Column(String(255)) #es la url del repositorio de pruebas en github
     estado_pruebas = Column(String(50))
     comentarios = Column(Text)
     pruebas = relationship("Prueba", backref="asistente")
@@ -76,7 +74,6 @@ class Categoria(Base):
     nombre = Column(String(100), nullable=False)
 
 engine = create_engine(DATABASE_URL, echo=False)
-# Después de crear engine, puedes crear un SQLDatabase LangChain:
 db = SQLDatabase.from_uri(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -225,7 +222,6 @@ def load_assistants_from_excel(excel_path: str):
     session.commit()
     print("Asistentes cargados en Postgres desde Excel.")
 
-    # Ahora actualizar el vectorstore
     vectorstore = get_vectorstore()
     for a, t in zip(nuevos_asistentes, assistants_data):
         vectorstore.add_texts(
@@ -233,7 +229,6 @@ def load_assistants_from_excel(excel_path: str):
             ids=[str(a.id)],
             metadatas=[{"id": a.id}]
         )
-    # No es necesario llamar a persist()
     print("Asistentes agregados a Chroma.")
 
 # --------------------------
@@ -272,7 +267,6 @@ def add_asistente_manualmente(
     session.commit()
     session.refresh(nuevo_asistente)
 
-    # Agregar al vectorstore
     vectorstore = get_vectorstore()
     texto_final = asistente_to_text(nuevo_asistente)
     vectorstore.add_texts(
@@ -280,7 +274,6 @@ def add_asistente_manualmente(
         ids=[str(nuevo_asistente.id)],
         metadatas=[{"id": nuevo_asistente.id}]
     )
-    # No es necesario llamar a persist()
 
     print(f"Asistente '{nombre}' agregado a Postgres y Chroma.")
 
@@ -337,7 +330,6 @@ def update_asistente(
         ids=[str(a.id)],
         metadatas=[{"id": a.id}]
     )
-    # No es necesario llamar a persist()
 
     print(f"Asistente con id {asistente_id} actualizado en Postgres y Chroma.")
 
@@ -356,7 +348,6 @@ def delete_asistente(asistente_id: int):
     # Eliminar del vectorstore
     vectorstore = get_vectorstore()
     vectorstore.delete(ids=[str(asistente_id)])
-    # No es necesario llamar a persist()
 
     print(f"Asistente con id {asistente_id} eliminado de Postgres y Chroma.")
 
@@ -386,10 +377,9 @@ def build_vectorstore_from_db():
         collection_name="asistentes_collection",
         persist_directory="chroma_db"
     )
-    # No es necesario llamar a persist()
     return vectorstore
 
-#vectorstore = build_vectorstore_from_db()
+
 vectorstore = get_vectorstore()
 retriever = None
 if vectorstore:
@@ -439,42 +429,6 @@ llm = ChatAnthropic(
 
 from langchain.prompts import PromptTemplate
 
-prompt_template = """
-    Tienes acceso a los siguientes asistentes de IA:
-
-    {context}
-
-    ---
-
-    **Ejemplo de cómo responder:**
-
-    **Consulta:**
-    Necesito un asistente de IA para pruebas automatizadas en JIRA.
-
-    **Respuesta:**
-    Te recomiendo usar AgileQA. Este asistente integra pruebas automatizadas con JIRA, lo que facilita el seguimiento ágil de tus proyectos. Puede ayudarte a generar reportes automáticos sobre el estado de las pruebas y asegurar que se alineen con los tickets de JIRA, mejorando la eficiencia y la coordinación en tu equipo.
-
-    ---
-
-    **Tu tarea:**
-    Selecciona el asistente de IA más adecuado para la siguiente consulta y explica detalladamente por qué es la mejor opción. Proporciona el nombre del asistente y una justificación clara basada en las descripciones proporcionadas.
-    En caso de que no haya ningún asistente relevante en el contexto dímelo.
-
-    **Consulta:**
-    {question}
-
-    **Respuesta (nombre del asistente y justificación):**
-    """
-
-prompt = PromptTemplate(
-    input_variables=["context", "question"],
-    template=prompt_template,
-)
-
-keyword_prompt = PromptTemplate(
-    input_variables=["query"],
-    template="Extrae las 4 palabras clave más importantes de la consulta '{query}' y sepáralas por comas."
-)
 
 keyword_prompt = PromptTemplate(
     input_variables=["query"],
@@ -485,9 +439,11 @@ keyword_prompt = PromptTemplate(
     Ejemplo1:
     Consulta: "Necesito un asistente para pruebas automatizadas en JIRA"
     Respuesta: "JIRA,pruebas,automatizadas"
+    
     Ejemplo2:
     Consulta: "Necesito un asistente para Angular"
     Respuesta: "angular,frontend,codigo"
+    
     Ejemplo3: 
     consulta: "Necesito un asistente para documentar mi codigo java"
     Respuesta: "java,documentacion,codigo"
@@ -503,7 +459,7 @@ def search_db_by_keywords(keywords: str):
     if "," in keywords:
         keywords_list = [k.strip() for k in keywords.split(",") if k.strip()]
     else:
-        # Si no hay comas, dividimos por espacio
+        # Si no hay comas, divido por espacio
         keywords_list = keywords.split()
 
     conditions = []
@@ -543,10 +499,10 @@ vectorstore_tool = Tool(
 )
 
 
-
 agent_prompt = PromptTemplate(
     input_variables=["input", "agent_scratchpad"],
-    template="""
+    template=
+        """
         Eres un agente que ayuda a seleccionar el mejor asistente de IA. La secuencia recomendada:
 
         1. Extrae las palabras clave de la consulta del usuario (ya se hizo y se pasará en el input).
@@ -565,68 +521,25 @@ agent = initialize_agent( tools=tools, llm=llm, agent=AgentType.ZERO_SHOT_REACT_
 
 
 
-
-
-
 app = Flask(__name__)
 CORS(app, resources={r"/query": {"origins": "http://localhost:4200"}})
 
-""" @app.route("/query", methods=["POST"])
-def get_response():
-    if not retriever:
-        return jsonify({"error": "No vectorstore found. Please load assistants first."}), 500
-
-    data = request.get_json()
-    query = data.get("query", "")
-    print(f"Consulta recibida: {query}")
-
-    relevant_docs = retriever.get_relevant_documents(query)
-    print(f"Documentos recuperados para la consulta '{query}': {len(relevant_docs)}")
-
-    context = "\n\n".join([doc.page_content for doc in relevant_docs])
-    print("Contexto enviado al LLM:")
-    print(context if context.strip() else "Contexto vacío.")
-
-    if not context.strip():
-        print("No se encontraron documentos relevantes para la consulta.")
-        return jsonify({"query": query, "response": "No se encontraron asistentes relevantes para tu consulta."})
-
-    full_prompt = prompt.format(context=context, question=query)
-    print("Prompt final enviado al LLM:")
-    print(full_prompt)
-
-    #response = watsonx_granite(full_prompt)
-    response = llm(full_prompt)
-    print("Respuesta del LLM:")
-    print(response)
-
-    #return jsonify({"query": query, "response": response})
-    return jsonify({"query": query, "response": response.content})
- """
 @app.route("/query", methods=["POST"])
 def get_response():
     data = request.get_json()
     query = data.get("query", "")
     print(f"Consulta recibida: {query}")
-
-    # 1. Generar las keywords
     keywords = keyword_chain.run(query=query)
     print("Keywords generadas:", keywords)
-
-    # 2. Ejecutar el agente
-    # Aquí le pasamos la consulta original y las keywords en el input del agente
-    # para que él sepa qué hacer. Por ejemplo:
     agente_input = f"La consulta del usuario es: '{query}'. Las keywords son: {keywords}"
     final_response = agent.run(agente_input)
-
     return jsonify({"query": query, "response": final_response})
 
 if __name__ == "__main__":
-    # Ejemplo de uso:
     #load_assistants_from_excel("asistentes_desarrollo.xlsx")
-    # add_asistente_manualmente(...)
-    # update_asistente(asistente_id=1, nombre="Nuevo Nombre")
-    # delete_asistente(asistente_id=1)
-    # build_vectorstore_from_db()  # Para regenerar vectorstore completo
+    #add_asistente_manualmente(...)
+    #update_asistente(asistente_id=1, nombre="Nuevo Nombre")
+    #delete_asistente(asistente_id=1)
+    #build_vectorstore_from_db()
     app.run(host="0.0.0.0", port=8000, debug=True)
 
