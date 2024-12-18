@@ -6,7 +6,6 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from database import search_db_by_keywords
 from vectorstore import get_vectorstore
-from langchain import SQLDatabase
 
 load_dotenv()
 
@@ -27,12 +26,12 @@ llm = ChatAnthropic(
 keyword_prompt = PromptTemplate(
     input_variables=["query"],
     template="""
-    Extrae exactamente 3 palabras clave más importantes de la siguiente consulta y sepáralas por comas sin espacios adicionales (centrate en las tecnologías):
+    Extrae exactamente 3 palabras clave más importantes de la siguiente consulta y sepáralas por comas sin espacios adicionales (centrate en las tecnologías y evita la keyword "asistente" ya que esta presente en casi todos):
     Consulta: {query}
 
     Ejemplo1:
-    Consulta: "Necesito un asistente para pruebas automatizadas en JIRA"
-    Respuesta: "JIRA,pruebas,automatizadas"
+    Consulta: "Necesito un asistente para hacer una api con springboot, que me recomiendas?"
+    Respuesta: "api,springboot,backend"
     
     Ejemplo2:
     Consulta: "Necesito un asistente para Angular"

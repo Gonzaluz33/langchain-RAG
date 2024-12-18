@@ -2,13 +2,12 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, Column, Integer, String, Text, Date, Float, ForeignKey, ARRAY, text
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from langchain import SQLDatabase
+from langchain_community.utilities import SQLDatabase
 from datetime import date
 from typing import List
 import pandas as pd
 
 load_dotenv()
-
 
 # --------------------------
 # Configuración de la BD Postgres (FUENTE DE VERDAD)
