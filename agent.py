@@ -10,6 +10,8 @@ from langchain import SQLDatabase
 
 load_dotenv()
 
+
+# Inicializar LLM Anthropic Claude 3.5 Haiku
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 if not anthropic_api_key:
     raise ValueError("La variable de entorno 'ANTHROPIC_API_KEY' no está configurada.")

@@ -2,9 +2,13 @@ import ollama
 from typing import List
 from langchain_community.vectorstores import Chroma
 from langchain.embeddings.base import Embeddings
-from database import get_all_asistentes
 from database import session, Asistente
 
+
+
+# --------------------------
+# Embeddings con Ollama
+# --------------------------------
 class OllamaEmbeddings:
     def __init__(self, model_name: str = "mxbai-embed-large"):
         self.model_name = model_name
@@ -51,6 +55,9 @@ class OllamaLangchainEmbeddings(Embeddings):
 ollama_model = OllamaEmbeddings("mxbai-embed-large")
 lc_embeddings = OllamaLangchainEmbeddings(ollama_model)
 
+# --------------------------
+# Helper: Crear texto desde un asistente para Chroma
+# --------------------------
 def asistente_to_text(asistente: Asistente) -> str:
     tech_list = asistente.tecnologias if asistente.tecnologias else []
     return (
@@ -62,6 +69,11 @@ def asistente_to_text(asistente: Asistente) -> str:
         f"Category: {asistente.categoria or ''}\n"
     )
 
+
+# --------------------------
+# Función para obtener vectorstore
+# Se usa la misma colección y directorio persistente
+# --------------------------
 def get_vectorstore() -> Chroma:
     vectorstore = Chroma(
         collection_name="asistentes_collection",
@@ -70,8 +82,12 @@ def get_vectorstore() -> Chroma:
     )
     return vectorstore
 
+
+# --------------------------
+# Reconstruir el vectorstore completo desde la BD
+# --------------------------
 def build_vectorstore_from_db():
-    asistentes_db = get_all_asistentes()
+    asistentes_db = session.query(Asistente).all()
     if not asistentes_db:
         print("No hay asistentes en Postgres. El vectorstore quedará vacío.")
         return None
