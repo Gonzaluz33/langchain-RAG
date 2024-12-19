@@ -1,0 +1,34 @@
+<!-- src/app/components/search-assistant/search-assistant.component.html -->
+<div class="search-container">
+  <h2>Buscar Asistente</h2>
+  <form [formGroup]="searchForm" (ngSubmit)="onSearch()">
+    <div class="form-group">
+      <label for="query">Consulta (query)</label>
+      <input id="query" formControlName="query" type="text" placeholder="Ingresa tu consulta" />
+      <div *ngIf="searchForm.get('query')?.invalid && searchForm.get('query')?.touched" class="error-msg">
+        La consulta es obligatoria.
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="keywords">Palabras Clave (opcional)</label>
+      <input id="keywords" formControlName="keywords" type="text" placeholder="Ejemplo: finanzas, salud" />
+    </div>
+
+    <button type="submit" [disabled]="searchForm.invalid || loading">Buscar</button>
+  </form>
+
+  <div class="results" *ngIf="loading">Cargando...</div>
+  <div class="results error" *ngIf="error">{{ error }}</div>
+
+  <div class="assistant-result" *ngIf="assistantResult">
+    <h3>Asistente Recomendado</h3>
+    <div class="assistant-info">
+      <p><strong>Consulta:</strong> {{ assistantResult.query }}</p>
+      <p><strong>Respuesta:</strong></p>
+      <p>{{ assistantResult.response }}</p>
+    </div>
+  </div>
+</div>
+
+  
